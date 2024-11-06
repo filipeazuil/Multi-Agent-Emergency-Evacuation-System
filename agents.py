@@ -1,41 +1,55 @@
 import spade
+from spade.behaviour import CyclicBehaviour
+from spade.message import Message
+
 
 class OccupantAgent(spade.agent.Agent):
-    def __init__(self, jid, password, location, mobility, destination):
+    def __init__(self, jid, password, location, mobility):
         super().__init__(jid, password)
         self.location = location
         self.mobility = mobility
-        self.destination = destination
 
     async def setup(self):
-        print("Occupant Agent {} is ready.".format(str(self.jid)))
-        print("Location: {}, Mobility: {}, Destination: {}".format(self.location, self.mobility, self.destination))
+        print(f"Occupant Agent {str(self.jid)} is ready.")
+        print(f"Location: {self.location}, Mobility: {self.mobility}")
+        # Adding the behavior to listen for incoming messages from the EmergencyResponderAgent
+        self.add_behaviour(self.ReceiveInstructionsBehaviour())
+
+    class ReceiveInstructionsBehaviour(CyclicBehaviour):
+        async def run(self):
+            # Wait for the message from the EmergencyResponderAgent
+            msg = await self.receive(timeout=0.1)  # Wait for a message, with a timeout of 10 seconds
+            if msg:
+                print(f"Received message: {msg.body}")
+                if msg.body == "EVACUATE":
+                    # If the message instructs to evacuate, execute the navigation method
+                    await self.agent.navigate_to_exit()
 
     async def navigate_to_exit(self):
-        print("Navigating to the nearest exit from location {}...".format(self.location))
-        # Implement navigation logic here
-        
+        print(f"Navigating to the nearest exit from location {self.location}...")
+        # Implement navigation logic here (this is a simple print for now)
+        self.location = "Exit"  # Assume they reach the exit
+        print(f"Occupant {self.jid} has arrived at the exit.")
 
-class BuildingManagementSystemAgent(spade.agent.Agent):
-    def __init__(self, jid, password):
-        super().__init__(jid, password)
 
 class EmergencyResponderAgent(spade.agent.Agent):
     def __init__(self, jid, password):
         super().__init__(jid, password)
 
     async def setup(self):
-        print("Emergency Responder Agent {} is ready.".format(str(self.jid)))
-        # Add behaviors for coordinating evacuation, assisting occupants, and managing safe flow
+        print(f"Emergency Responder Agent {str(self.jid)} is ready.")
+        # Adding the behavior to send evacuation instructions
+        self.add_behaviour(self.SendEvacuationInstructionsBehaviour())
 
-    async def evacuate(self):
-        print("Evacuating occupants...")
+    class SendEvacuationInstructionsBehaviour(CyclicBehaviour):
+        async def run(self):
+            occupants = ["occupant1@localhost", "occupant2@localhost", "occupant3@localhost"]
+            for i in occupants:
+                # Send an evacuation message to each OccupantAgent
+                msg = Message(to=i)  # Replace with real occupant agent JIDs
+                msg.body = "EVACUATE"  # The action or instruction for the occupant agent
+                await self.send(msg)
+                print(f"Sent evacuation message to {msg.to}")
 
-    async def assist_occupants(self):
-        print("Assisting occupants...")
-
-    async def manage_flow(self):
-        print("Managing safe flow of people to exits...")
-
-    async def respond_to_incidents(self):
-        print("Responding to incidents...")
+            # Stop the behavior after sending the message to all occupants
+            await self.agent.stop()
