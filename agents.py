@@ -6,30 +6,61 @@ from spade.message import Message
 class OccupantAgent(spade.agent.Agent):
     def __init__(self, jid, password, location, mobility):
         super().__init__(jid, password)
-        self.location = location
+        self.location = location  # Expected to be a Room object
         self.mobility = mobility
 
     async def setup(self):
         print(f"Occupant Agent {str(self.jid)} is ready.")
-        print(f"Location: {self.location}, Mobility: {self.mobility}")
-        # Adding the behavior to listen for incoming messages from the EmergencyResponderAgent
+        print(f"Location: {self.location.coordinates}, Mobility: {self.mobility}")
         self.add_behaviour(self.ReceiveInstructionsBehaviour())
 
     class ReceiveInstructionsBehaviour(CyclicBehaviour):
         async def run(self):
-            # Wait for the message from the EmergencyResponderAgent
-            msg = await self.receive(timeout=0.1)  # Wait for a message, with a timeout of 10 seconds
+            msg = await self.receive(timeout=0.1)
             if msg:
                 print(f"Received message: {msg.body}")
                 if msg.body == "EVACUATE":
-                    # If the message instructs to evacuate, execute the navigation method
                     await self.agent.navigate_to_exit()
 
     async def navigate_to_exit(self):
-        print(f"Navigating to the nearest exit from location {self.location}...")
-        # Implement navigation logic here (this is a simple print for now)
-        self.location = "Exit"  # Assume they reach the exit
-        print(f"Occupant {self.jid} has arrived at the exit.")
+        # Define the exits (assembly points as Room objects)
+        exit_a = Room(floor=0, row=0, column=0)  # Replace with actual Room instance
+        exit_b = Room(floor=0, row=2, column=1)  # Replace with actual Room instance
+
+        # Choose the nearest exit based on a distance calculation
+        exit_a_dist = self.location.distance_to(exit_a)
+        exit_b_dist = self.location.distance_to(exit_b)
+        nearest_exit = exit_a if exit_a_dist <= exit_b_dist else exit_b
+
+        print(f"{self.jid} is navigating from {self.location.coordinates} to nearest exit at {nearest_exit.coordinates}")
+
+        # Move towards the exit step by step
+        while self.location != nearest_exit:
+            # Find the next best room to move towards the exit
+            next_room = self.get_next_room_towards_exit(nearest_exit)
+            if next_room:
+                # Move to the next room and update location
+                print(f"{self.jid} moved from {self.location.coordinates} to {next_room.coordinates}")
+                self.location = next_room
+                await self.sleep(1)  # Simulate the time taken to move
+            else:
+                print(f"{self.jid} is unable to find a path to the exit!")
+                break
+
+        if self.location == nearest_exit:
+            print(f"{self.jid} has arrived at the exit at {nearest_exit.coordinates}!")
+        self.location = "Exit"  # Mark as exited
+
+    def get_next_room_towards_exit(self, target_room):
+        """
+        Selects the next room to move to, based on proximity to the target room.
+        """
+        # Get neighboring rooms
+        neighbors = self.location.get_neighbors()
+        # Sort neighbors by distance to the target room and pick the closest
+        neighbors = sorted(neighbors, key=lambda room: room.distance_to(target_room))
+        return neighbors[0] if neighbors else None
+
 
 
 class EmergencyResponderAgent(spade.agent.Agent):
