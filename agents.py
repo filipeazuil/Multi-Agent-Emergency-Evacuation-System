@@ -4,14 +4,15 @@ from spade.message import Message
 
 
 class OccupantAgent(spade.agent.Agent):
-    def __init__(self, jid, password, location, mobility):
+    def __init__(self, jid, password, environment, location, mobility):
         super().__init__(jid, password)
         self.location = location  # Expected to be a Room object
         self.mobility = mobility
+        self.environment=environment
 
     async def setup(self):
         print(f"Occupant Agent {str(self.jid)} is ready.")
-        print(f"Location: {self.location.coordinates}, Mobility: {self.mobility}")
+        print(f"Location: {self.location.name}, Mobility: {self.mobility}")
         self.add_behaviour(self.ReceiveInstructionsBehaviour())
 
     class ReceiveInstructionsBehaviour(CyclicBehaviour):
@@ -23,16 +24,15 @@ class OccupantAgent(spade.agent.Agent):
                     await self.agent.navigate_to_exit()
 
     async def navigate_to_exit(self):
-        # Define the exits (assembly points as Room objects)
-        exit_a = Room(floor=0, row=0, column=0)  # Replace with actual Room instance
-        exit_b = Room(floor=0, row=2, column=1)  # Replace with actual Room instance
+        exit_a=self.environment.assembly_points[0]
+        exit_b=self.environment.assembly_points[1]
 
         # Choose the nearest exit based on a distance calculation
         exit_a_dist = self.location.distance_to(exit_a)
         exit_b_dist = self.location.distance_to(exit_b)
         nearest_exit = exit_a if exit_a_dist <= exit_b_dist else exit_b
 
-        print(f"{self.jid} is navigating from {self.location.coordinates} to nearest exit at {nearest_exit.coordinates}")
+        print(f"{self.jid} is navigating from {self.location.name} to nearest exit at {nearest_exit.name}")
 
         # Move towards the exit step by step
         while self.location != nearest_exit:
@@ -40,15 +40,14 @@ class OccupantAgent(spade.agent.Agent):
             next_room = self.get_next_room_towards_exit(nearest_exit)
             if next_room:
                 # Move to the next room and update location
-                print(f"{self.jid} moved from {self.location.coordinates} to {next_room.coordinates}")
+                print(f"{self.jid} moved from {self.location.name} to {next_room.name}")
                 self.location = next_room
-                await self.sleep(1)  # Simulate the time taken to move
             else:
                 print(f"{self.jid} is unable to find a path to the exit!")
                 break
 
         if self.location == nearest_exit:
-            print(f"{self.jid} has arrived at the exit at {nearest_exit.coordinates}!")
+            print(f"{self.jid} has arrived at the exit at {nearest_exit.name}!")
         self.location = "Exit"  # Mark as exited
 
     def get_next_room_towards_exit(self, target_room):
