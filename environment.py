@@ -1,82 +1,164 @@
-# Room class to represent each room in the building
-class Room:
-    def __init__(self, floor_number, i,j):
-        self.name = f"Room {floor_number}{i}{j}"  # Room ID, e.g., "Room_1"
-        self.connections = []  # Rooms connected to this one
-        self.coordinates=[floor_number,i,j]
-
-    # Method to add a connection to another room
-    def add_connection(self, other_room):
-        self.connections.append(other_room)
-    
-    def distance_to(self, other_room):
-    	return abs(self.coordinates[0] - other_room.coordinates[0]) + abs(self.coordinates[1] - other_room.coordinates[1]) + abs(self.coordinates[2] - other_room.coordinates[2])
-    
-    def get_neighbors(self):
-    	return self.connections
-
-
-# Floor class to represent each floor with rooms and assembly points
-class Floor:
-    def __init__(self, floor_number, num_rows, num_cols):
-        self.floor_number = floor_number
-        self.rooms = [[Room(floor_number,i,j) for j in range(num_cols)] for i in range(num_rows)]
-
-    # Get room by its coordinates on the floor
-    def get_room(self, row, col):
-        return self.rooms[row][col]
-
-    # Method to create connections between adjacent rooms
-    def create_room_connections(self):
-        rows, cols = len(self.rooms), len(self.rooms[0])
-        for i in range(rows):
-            for j in range(cols):
-                room = self.rooms[i][j]
-                # Connect with room to the right
-                if j < cols - 1:
-                    right_room = self.rooms[i][j + 1]
-                    room.add_connection(right_room)
-                    right_room.add_connection(room)
-                # Connect with room below
-                if i < rows - 1:
-                    below_room = self.rooms[i + 1][j]
-                    room.add_connection(below_room)
-                    below_room.add_connection(room)
-
-
-# Building class to represent the entire building with floors, rooms, and an elevator
 class Building:
     def __init__(self):
-        self.floors = [Floor(1, 3, 2), Floor(2, 3, 2)]  # Two floors with 3x2 room layout
-        self.elevator = "Elevator"  # Simplified elevator as a connection between floors
-        self.create_floor_connections()
-        self.agents = {}
-        self.emergency_agents = {}
-        self.management_agents = {}
-        self.assembly_points=[self.floors[0].get_room(0,0),self.floors[0].get_room(2,1)]
-
-    # Create room connections within each floor
-    def create_floor_connections(self):
-        for floor in self.floors:
-            floor.create_room_connections()
+    
+        self.floors = 2
+        self.rows = 2
+        self.columns = 3
         
-    def get_room(self, floor, row, col):
-    	return self.floors[floor-1].get_room(row, col)
-
-    # Connect a room on one floor to a room on another floor via the elevator
-    def connect_elevator(self, floor1_room, floor2_room):
-        floor1_room.add_connection(floor2_room)
-        floor2_room.add_connection(floor1_room)
+        self.structure = [[[None for _ in range(self.columns)] for _ in range(self.rows)] for _ in range(self.floors)]
         
-    def add_agent(self, agent):
-    	self.agent=agent
-    	self.agents[self.agent.jid]=self.agent
-    	
-    def add_emergency_agent(self, emergency_agent):
-    	self.emergency_agent=emergency_agent
-    	self.emergency_agents[self.emergency_agent.jid]=self.emergency_agent
-    	
-    def add_management_agent(self, management_agent):
-    	self.management_agent=management_agent
-    	self.management_agents[self.management_agent.jid]=self.management_agent
+        self.rooms = [[[{"door": True, "windows": 1} for _ in range(self.columns)] 
+                       for _ in range(self.rows)] for _ in range(self.floors)]
+                       
+        self.incidents = [[[False for _ in range(self.columns)] for _ in range(self.rows)] for _ in range(self.floors)]
+        
+        self.occupants = {}
+        self.emergency = {} # 
+        self.buildingmanagement = {}
+        
+        self.elevator = {"location": (0, 0, 0), "status": "idle"}  # Elevador localizado na entrada
+        self.emergency_stairs = [{"floor": floor, "location": (2, 1)} for floor in range(self.floors)]  # Escada de emergência em cada andar
+        self.exits = [(self.floors - 1, 1, 2)] 
+
+	self.elevator_moving = False
+        self.elevator_occupied = False
+        self.elevator_operational = True # Passa a falso em caso de incêndio por exemplo
+        
+        # Gerenciamento de alarmes e emergência
+        self.alarm_triggered_earthquake = False
+        self.alarm_triggered_fire = False
+        self.evacuated_rooms = []
+        
+        
+    def trigger_alarm_earthquake(self):
+        self.alarm_triggered_earthquake = True
+        self.disable_elevator()
+        print("Earthquake alarm triggered. Elevator disabled.")
+        
+        # Notificar ocupantes com instruções específicas para terremoto
+        for occupant in self.get_all_occupants():
+            occupant.receive_alert("Earthquake detected! Move carefully to safe areas. Avoid elevators.")
+        print("All occupants notified of earthquake protocol.")
+        
+        
+    def trigger_alarm_fire(self):
+        self.alarm_triggered_fire = True
+        self.disable_elevator()
+        print("Fire alarm triggered. Elevator disabled.")
+        
+        # Notificar ocupantes com instruções específicas para incêndio
+        for occupant in self.get_all_occupants():
+            occupant.receive_alert("Fire detected! Evacuate to the nearest exit immediately.")
+        print("All occupants notified of fire evacuation protocol.")
+        
+        
+    def detect_fire(self, floor, row, column):
+        incident = {
+            "floor": floor,
+            "row": row,
+            "column": column,
+            "type": "Fire"
+        }
+        self.incidents.append(incident)
+        self.disable_elevator()
+        self.trigger_alarm()
+        print(f"Fire incident detected at floor {floor}, row {row}, column {column}. Evacuate building.")
+    
+    
+    # Função para detectar um problema de saúde
+    def detect_health_issue(self, floor, row, column):
+        incident = {
+            "floor": floor,
+            "row": row,
+            "column": column,
+            "type": "Health Issue"
+        }
+        self.incidents.append(incident)
+        self.dispatch_medical_team(floor, row, column)
+        print(f"Health issue detected at floor {floor}, row {row}, column {column}. Medical team dispatched.")
+        
+        
+    def detect_earthquake(self, floor, row, column):
+    	incident = {
+    		"floor" = floor, 
+    		"row" = row,
+    		"column" = column, 
+    		"type" = "Earthquake"
+    	}
+    	self.incidents.append(incident)
+    	self.trigger_alarm_earthquake()
+    	print(f"Earthquake detected")
+    
+       
+    def set_room(self, floor, row, column, value):
+        if 0 <= floor < self.floors and 0 <= row < self.rows and 0 <= column < self.columns:
+            self.structure[floor][row][column] = value
+        else:
+            raise IndexError("Invalid floor, row, or column index")
+
+    def get_room(self, floor, row, column):
+        if 0 <= floor < self.floors and 0 <= row < self.rows and 0 <= column < self.columns:
+            return self.structure[floor][row][column]
+        else:
+            raise IndexError("Invalid floor, row, or column index")
+
+    def display_building(self):
+        for floor in range(self.floors):
+            print(f"Floor {floor}:")
+            for row in range(self.rows):
+                print(self.structure[floor][row])
+            print()
+            
+    def disable_elevator(self):
+        self.elevator_operational = False
+        self.elevator["status"] = "disabled"
+        print("Elevator disabled due to emergency.")
+
+    def enable_elevator(self):
+        self.elevator_operational = True
+        self.elevator["status"] = "idle"
+        print("Elevator is now operational.")
+
+
+    def register_agent(self, agent):
+        self.agents.append(agent)
+        print(f"Agent {agent.jid} registered in the building.")
+
+    def update_agent_location(self, agent, new_location):
+        agent.location = new_location
+        print(f"Agent {agent.jid} moved to {new_location}.")
+        
+    def detect_incident(self, floor, row, column, type):
+        incident = {
+            "floor": floor,
+            "row": row,
+            "column": column,
+            "type": type  # Incêndio, problema de saúde etc
+        }
+        self.incidents.append(incident)  
+        print(f"Incident detected at floor {floor}, row {row}, column {column}")
+       
+    def reset_building(self):
+        self.structure = [[[None for _ in range(self.columns)] for _ in range(self.rows)] for _ in range(self.floors)]
+        self.agents.clear()
+        print("Building reset to initial state.")
+     
+    def deploy_emergency_responders(self):
+        for agent in self.agents:
+            if isinstance(agent, EmergencyResponderAgent):
+                agent.evacuate()
+                print(f"Emergency responder {agent.jid} deployed.")
+
+    def simulate_evacuation(self):
+        print("Starting evacuation simulation...")
+        for agent in self.agents:
+            if isinstance(agent, OccupantAgent):
+                agent.navigate_to_exit()
+            elif isinstance(agent, EmergencyResponderAgent):
+                agent.evacuate()
+                agent.assist_occupants()
+                agent.manage_flow()
+                agent.respond_to_incidents()
+                
+
 
