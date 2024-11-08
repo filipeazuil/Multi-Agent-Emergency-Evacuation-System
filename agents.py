@@ -1,8 +1,96 @@
 import spade
 from spade.behaviour import CyclicBehaviour
 from spade.message import Message
+import asyncio
 
 
+class OccupantAgent(spade.agent.Agent):
+    def __init__(self, jid, password, environment, location, mobility):
+        super().__init__(jid, password)
+        self.location = location  # Expected to be a Room object
+        self.mobility = mobility
+        self.environment = environment
+        self.avoid_rooms = set()  # Keep track of rooms to avoid due to fire or earthquake
+
+    async def setup(self):
+        print(f"Occupant Agent {str(self.jid)} is ready.")
+        print(f"Location: {self.location.name}, Mobility: {self.mobility}")
+        self.add_behaviour(self.ReceiveInstructionsBehaviour())
+
+    class ReceiveInstructionsBehaviour(CyclicBehaviour):
+        async def run(self):
+            msg = await self.receive(timeout=0.1)
+            if msg:
+                print(f"Received message: {msg.body}")
+                if msg.body.startswith("Avoid room"):
+                    room_name = msg.body.split()[-1]  # Extract room name to avoid
+                    self.agent.avoid_rooms.add(room_name)
+                    print(f"{self.agent.jid} will avoid room {room_name}.")
+                elif msg.body == "EVACUATE":
+                    await self.agent.navigate_to_exit()
+
+    def get_next_room_towards_exit(self, target_room):
+    
+        neighbors = self.location.get_neighbors()
+        # Filter out rooms to avoid (due to fire or earthquake)
+        neighbors = [room for room in neighbors if room.name not in self.avoid_rooms]
+        if not neighbors:
+            print(f"No available rooms to move towards! {self.jid} is stuck.")
+            return None
+        # Sort neighbors by distance to the target room and pick the closest
+        neighbors = sorted(neighbors, key=lambda room: room.distance_to(target_room))
+        return neighbors[0] if neighbors else None
+
+    async def navigate_to_exit(self):
+        exit_a = self.environment.assembly_points[0]
+        exit_b = self.environment.assembly_points[1]
+
+        # Choose the nearest exit based on a distance calculation
+        exit_a_dist = self.location.distance_to(exit_a)
+        exit_b_dist = self.location.distance_to(exit_b)
+        nearest_exit = exit_a if exit_a_dist <= exit_b_dist else exit_b
+
+        print(f"{self.jid} is navigating from {self.location.name} to nearest exit at {nearest_exit.name}")
+
+        # Check if the current location and exit are on the same floor
+        if self.location.floor != nearest_exit.floor:
+            elevator=self.environment.get_floor(self.location.floor).elevator
+            if self.mobility=="disabled":
+                destination=elevator
+                method="elevator"
+            else:
+                staircase=self.environment.get_floor(self.location.floor).staircase
+                dist_elev=self.location.distance_to(elevator)
+                dist_stairs=self.location.distance_to(staircase)
+                if dist_elev<=dist_stairs:
+                    destination = elevator  
+                    method="elevator"
+                else:
+                    destination=staircase
+                    method="staircase"
+
+            print(f"{self.jid} is moving to {destination.name} to change floors using the {method}.")
+            # Navigate to the elevator or staircase first
+            while self.location != destination:
+                next_room = self.get_next_room_towards_exit(destination)
+                await asyncio.sleep(5)
+                print(f"{self.jid} moved from {self.location.name} to {next_room.name}")
+                self.location = next_room
+            # After reaching elevator or staircase, move to the target floor
+            dest_room = self.environment.get_room(nearest_exit.floor-1,destination.coordinates[1],self.location.coordinates[2])
+            self.location = dest_room
+            print(f"{self.jid} is now on floor {self.location.floor} after using the {method}. Continuing to the exit.")
+        while self.location != nearest_exit:
+            next_room = self.get_next_room_towards_exit(nearest_exit)
+            await asyncio.sleep(1)
+            # Move to the next room and update location
+            print(f"{self.jid} moved from {self.location.name} to {next_room.name}")
+            self.location = next_room
+        if self.location == nearest_exit:
+            print(f"{self.jid} has arrived at the exit at {nearest_exit.name}!")
+
+
+'''
 class OccupantAgent(spade.agent.Agent):
     def __init__(self, jid, password, environment, location, mobility):
         super().__init__(jid, password)
@@ -23,32 +111,6 @@ class OccupantAgent(spade.agent.Agent):
                 if msg.body == "EVACUATE":
                     await self.agent.navigate_to_exit()
 
-    async def navigate_to_exit(self):
-        exit_a=self.environment.assembly_points[0]
-        exit_b=self.environment.assembly_points[1]
-
-        # Choose the nearest exit based on a distance calculation
-        exit_a_dist = self.location.distance_to(exit_a)
-        exit_b_dist = self.location.distance_to(exit_b)
-        nearest_exit = exit_a if exit_a_dist <= exit_b_dist else exit_b
-
-        print(f"{self.jid} is navigating from {self.location.name} to nearest exit at {nearest_exit.name}")
-
-        # Move towards the exit step by step
-        while self.location != nearest_exit:
-            # Find the next best room to move towards the exit
-            next_room = self.get_next_room_towards_exit(nearest_exit)
-            if next_room:
-                # Move to the next room and update location
-                print(f"{self.jid} moved from {self.location.name} to {next_room.name}")
-                self.location = next_room
-            else:
-                print(f"{self.jid} is unable to find a path to the exit!")
-                break
-
-        if self.location == nearest_exit:
-            print(f"{self.jid} has arrived at the exit at {nearest_exit.name}!")
-        self.location = "Exit"  # Mark as exited
 
     def get_next_room_towards_exit(self, target_room):
         """
@@ -59,9 +121,122 @@ class OccupantAgent(spade.agent.Agent):
         # Sort neighbors by distance to the target room and pick the closest
         neighbors = sorted(neighbors, key=lambda room: room.distance_to(target_room))
         return neighbors[0] if neighbors else None
+        
+    async def navigate_to_exit(self):
+        exit_a = self.environment.assembly_points[0]
+        exit_b = self.environment.assembly_points[1]
+
+        # Choose the nearest exit based on a distance calculation
+        exit_a_dist = self.location.distance_to(exit_a)
+        exit_b_dist = self.location.distance_to(exit_b)
+        nearest_exit = exit_a if exit_a_dist <= exit_b_dist else exit_b
+
+        print(f"{self.jid} is navigating from {self.location.name} to nearest exit at {nearest_exit.name}")
+
+        # Check if the current location and exit are on the same floor
+        if self.location.floor != nearest_exit.floor:
+            elevator=self.environment.get_floor(self.location.floor).elevator
+            if self.mobility=="disabled":
+                destination=elevator
+                method="elevator"
+            else:
+                staircase=self.environment.get_floor(self.location.floor).staircase
+                dist_elev=self.location.distance_to(elevator)
+                dist_stairs=self.location.distance_to(staircase)
+                if dist_elev<=dist_stairs:
+                    destination = elevator  
+                    method="elevator"
+                else:
+                    destination=staircase
+                    method="staircase"
+
+            print(f"{self.jid} is moving to {destination.name} to change floors using the {method}.")
+            # Navigate to the elevator or staircase first
+            while self.location != destination:
+                next_room = self.get_next_room_towards_exit(destination)
+                await asyncio.sleep(5)
+                print(f"{self.jid} moved from {self.location.name} to {next_room.name}")
+                self.location = next_room
+            # After reaching elevator or staircase, move to the target floor
+            dest_room = self.environment.get_room(nearest_exit.floor-1,destination.coordinates[1],self.location.coordinates[2])
+            self.location = dest_room
+            print(f"{self.jid} is now on floor {self.location.floor} after using the {method}. Continuing to the exit.")
+        while self.location != nearest_exit:
+            next_room = self.get_next_room_towards_exit(nearest_exit)
+            await asyncio.sleep(1)
+            # Move to the next room and update location
+            print(f"{self.jid} moved from {self.location.name} to {next_room.name}")
+            self.location = next_room
+        if self.location == nearest_exit:
+            print(f"{self.jid} has arrived at the exit at {nearest_exit.name}!")
+'''
 
 
+class EmergencyResponderAgent(spade.agent.Agent):
+    def __init__(self, jid, password, environment):
+        super().__init__(jid, password)
+        self.environment = environment  # Environment to check for events
 
+    async def setup(self):
+        print(f"Emergency Responder Agent {str(self.jid)} is ready.")
+        # Adding the behavior to monitor events and send evacuation instructions
+        self.add_behaviour(self.MonitorEventsBehaviour())
+        self.add_behaviour(self.SendEvacuationInstructionsBehaviour())
+        
+    class SendEvacuationInstructionsBehaviour(CyclicBehaviour):
+        async def run(self):
+            occupants = ["occupant1@localhost", "occupant2@localhost", "occupant3@localhost"]
+            for i in occupants:
+                # Send an evacuation message to each OccupantAgent
+                msg = Message(to=i)  # Replace with real occupant agent JIDs
+                msg.body = "EVACUATE"  # The action or instruction for the occupant agent
+                await self.send(msg)
+                print(f"Sent evacuation message to {msg.to}")
+
+            # Stop the behavior after sending the message to all occupants
+            await self.agent.stop()  
+
+    class MonitorEventsBehaviour(CyclicBehaviour):
+        async def run(self):
+            # Monitor the environment for any fire or earthquake events
+            await asyncio.sleep(0.5)  # Check every 2 seconds (can be adjusted)
+            # Check for fire in rooms
+            for floor in self.agent.environment.floors:
+                for row in floor.rooms:
+                    for room in row:
+                        if room.is_on_fire:
+                            print(f"Emergency Responder detected fire in {room.name}!")
+                            # Send evacuation instruction to avoid fire
+                            await self.send_evacuate_instruction(room)
+                            print(f"Emergency Responder is heading to {room.name} to extinguish the fire.")
+                            # Move to the room and extinguish fire
+                            await self.navigate_to_room(room)
+                            room.is_on_fire = False
+                            print(f"Fire extinguished in {room.name}.")
+
+            # Check for earthquake damage
+            for floor in self.agent.environment.floors:
+                for row in floor.rooms:
+                    for room in row:
+                        if room.is_damaged:
+                            print(f"Emergency Responder detected earthquake damage in {room.name}!")
+                            # Send evacuation instruction to avoid damaged rooms
+                            await self.send_evacuate_instruction(room)
+
+        async def send_evacuate_instruction(self, room):
+            # Send evacuation instruction to all occupants to avoid this room
+            occupants = ["occupant1@localhost", "occupant2@localhost", "occupant3@localhost"]  # Placeholder JIDs
+            for jid in occupants:
+                msg = Message(to=jid)
+                msg.body = f"Avoid room {room.name} due to fire or earthquake damage."
+                await self.send(msg)
+                print(f"Sent evacuation message to {jid} for {room.name}")
+
+        async def navigate_to_room(self, room):
+            await asyncio.sleep(2)  # Simulate time taken to reach the room
+
+
+'''
 class EmergencyResponderAgent(spade.agent.Agent):
     def __init__(self, jid, password):
         super().__init__(jid, password)
@@ -82,4 +257,5 @@ class EmergencyResponderAgent(spade.agent.Agent):
                 print(f"Sent evacuation message to {msg.to}")
 
             # Stop the behavior after sending the message to all occupants
-            await self.agent.stop()
+            await self.agent.stop()         
+'''
