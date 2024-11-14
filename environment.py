@@ -9,11 +9,14 @@ class Room:
         self.elevator_connections = []
         self.staircase_connections = []
         self.coordinates=[floor_number,i,j]
+        self.light=True
         self.floor=floor_number
-        self.is_on_fire = False  # State of fire
-        self.is_damaged = False  # State of earthquake damage
+        self.is_on_fire = False
+        self.is_damaged = False
+        self.is_taken = False
         self.noted_fire=False
         self.noted_earthquake = False
+        self.noted_attack = False
 
     # Method to add a connection to another room
     def add_connection(self, other_room):
@@ -42,7 +45,12 @@ class Room:
             print(f"Fire is spreading to {next_room.name}")
 
     def damage_by_earthquake(self):
+        if random.random()<0.5:
+            self.light=False
         self.is_damaged = True
+    
+    def taken_by_attacker(self):
+        self.is_taken = True
 
 
 # Floor class to represent each floor with rooms and assembly points
@@ -84,8 +92,10 @@ class Building:
         self.management_agents = {}
         self.assembly_points=[self.floors[0].get_room(0,0),self.floors[0].get_room(4,0)]
         self.begin=time.time()
-        self.num_fires=0
-        self.num_earthquakes=0
+        self.num_fires=[0,0]
+        self.num_earthquakes=[0,0]
+        self.num_attacks=[0,0]
+        self.responses=0
 
     # Create room connections within each floor
     def create_floor_connections(self):
@@ -126,20 +136,21 @@ class Building:
     
     def trigger_random_event(self):
         # Randomly trigger a fire or earthquake
-        if random.random() < 0.5:  # 10% chance for fire
+        if random.random() < 0.5:  # 50% chance for fire
             floor = random.choice(self.floors)
             room = random.choice(random.choice(floor.rooms))
-            while room.is_on_fire==True:
-                room = random.choice(random.choice(floor.rooms))
-            print(f"Fire started in {room.name}!")
             room.start_fire()
 
-        if random.random() < 0.3:  # 5% chance for earthquake
+        elif random.random() < 0.3:  # 30% chance for earthquake
             floor = random.choice(self.floors)
             room = random.choice(random.choice(floor.rooms))
-            while room.is_damaged==True:
-                room = random.choice(random.choice(floor.rooms))
             room.damage_by_earthquake()	
+        
+        elif random.random() < 0.3:
+            floor = random.choice(self.floors)
+            room = random.choice(random.choice(floor.rooms))
+            room.taken_by_attacker()
+            
 
     def simulate_step(self):
         self.trigger_random_event()
@@ -150,14 +161,38 @@ class Building:
                 return False
         return True
 
+    def get_random_room(self):
+        floor = random.choice(self.floors)
+        return random.choice(random.choice(floor.rooms))
+       
+        
+    def connect_elevators(self):
+        room_003 = self.get_room(0,0,3)
+        room_103 = self.get_room(1,0,3)
+        room_203 = self.get_room(2,0,3)
+        room_303 = self.get_room(3,0,3)
+        self.connect_elevator(room_003, room_103)
+        self.connect_elevator(room_203, room_303)
+    
+    def connect_staircases(self):
+        room_043 = self.get_room(0,4,3)
+        room_143 = self.get_room(1,4,3)
+        room_343 = self.get_room(3,4,3)
+        room_243 = self.get_room(2,4,3)
+        self.connect_staircase(room_243, room_343)
+        self.connect_staircase(room_043, room_143)
+
     def perfomance_metrics(self):
-        print(f"Number of Fires: {self.num_fires}")
-        print(f"Number of Earthquakes: {self.num_earthquakes}")
+        print(f"Number of Fires Extinguished / Total Fires: {self.num_fires[0]}/{self.num_fires[1]}")
+        print(f"Number of Earthquakes: {self.num_earthquakes[0]}/{self.num_earthquakes[1]}")
+        print(f"Number of Attacks Controlled / Total Attacks: {self.num_attacks[0]}/{self.num_attacks[1]}")
+        print(f"Number of Occupant Agents Evacuated / Total Occupant Agents: {len(self.agents.keys())}/{len(self.agents.keys())}")
         time_spent_list=[]
         for i in self.agents.values():
             time_spent=i.finish_time - self.begin
             time_spent_list.append(time_spent)
-            print(f"Agent {i.name} took {time_spent} to evacuate")
+            print(f"Agent {i.agent_name} took {time_spent} to evacuate")
         total_time=max(time_spent_list)
         print(f"Total Evacuation Time: {total_time}")
-
+        #print(f"Number of problems solved by Emergency Responders: {self.responses}")
+    	#print(f"Average Response Time of Emergency Responders: {avg}")
