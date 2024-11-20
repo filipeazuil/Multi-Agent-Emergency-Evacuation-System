@@ -278,7 +278,7 @@ async def main():
             total_time = max(time_spent_list)
             final_metrics+=f"Total Evacuation Time: {total_time:.2f}\n"
             final_metrics+=f"Number of problems solved by Emergency Responders: {len(building.times)}\n"
-            final_metrics+=f"Average Response Time of Emergency Responders: {sum(building.times)/len(building.times):.2f}\n"
+            final_metrics+=f"Average Response Time of Emergency Responders: {sum(building.times)/len(building.times) if len(building.times) != 0 else 0:.2f}\n"
         
     print("Every Occupant evacuated! Success!")
     values = building.performance_metrics()
@@ -297,7 +297,7 @@ async def main():
     
 async def run_tests():
     values_total=[0]*11
-    n=2
+    n=20
     for i in range(n):
         print(f"Running test {i + 1}...")
         values = await main()
@@ -306,10 +306,10 @@ async def run_tests():
     print(f"Number of Earthquakes: {values_total[2]}/{values_total[3]}")
     print(f"Number of Attacks Controlled / Total Attacks: {values_total[4]}/{values_total[5]}")
     print(f"Number of Occupant Agents Evacuated / Total Occupant Agents: {values_total[6]}/{values_total[7]}")
-    print(f"Average Total Evacuation Time: {values_total[8]/n}")
-    print(f"Number of problems solved by Emergency Responders: {values_total[9]}")
+    print(f"Average Total Evacuation Time: {values_total[9]/n}")
+    print(f"Number of problems solved by Emergency Responders: {values_total[8]}")
     print(f"Average Response Time of Emergency Responders: {values_total[10]/n:.2f}")
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    asyncio.run(run_tests())
 

@@ -230,7 +230,7 @@ class Building:
             self.connect_staircase(room1, room2)
 
     def performance_metrics(self):
-        values=[self.num_fires[0],self.num_fires[1],self.num_earthquakes[0],self.num_earthquakes[1],self.num_attacks[0],self.num_attacks[1],len(self.agents.keys()),len(self.agents.keys()),len(self.times),sum(self.times)/len(self.times)]
+        values=[self.num_fires[0],self.num_fires[1],self.num_earthquakes[0],self.num_earthquakes[1],self.num_attacks[0],self.num_attacks[1],len(self.agents.keys()),len(self.agents.keys()),len(self.times)]
         print(f"Number of Fires Extinguished / Total Fires: {self.num_fires[0]}/{self.num_fires[1]}")
         print(f"Number of Earthquakes: {self.num_earthquakes[0]}/{self.num_earthquakes[1]}")
         print(f"Number of Attacks Controlled / Total Attacks: {self.num_attacks[0]}/{self.num_attacks[1]}")
@@ -246,7 +246,9 @@ class Building:
         values.append(total_time)
         print(f"Total Evacuation Time: {total_time:.2f}")
         print(f"Number of problems solved by Emergency Responders: {len(self.times)}")
-        print(f"Average Response Time of Emergency Responders: {sum(self.times)/len(self.times):.2f}")
+        print(f"Average Response Time of Emergency Responders: {sum(self.times)/len(self.times) if len(self.times) !=0 else 0:.2f}")
+        avg_response=sum(self.times)/len(self.times) if len(self.times) !=0 else 0
+        values.append(avg_response)
         return values
         
     def update_perf_metrics():
