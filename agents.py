@@ -16,9 +16,11 @@ class OccupantAgent(spade.agent.Agent):
         self.is_evacuated = False
 
     async def setup(self):
-        print(f"Occupant Agent {self.agent_name} is ready. Location: {self.location.name}, Mobility: {self.mobility}")
-        if self.mobility=="able-bodied": self.pace=2
-        else: self.pace=3
+        update=f"Occupant Agent {self.agent_name} is ready. Location: {self.location.name}, Mobility: {self.mobility}"
+        self.environment.add_update(update)
+        print(update)
+        if self.mobility=="able-bodied": self.pace=4
+        else: self.pace=5
         self.add_behaviour(self.ReceiveInstructionsBehaviour())
 
     class ReceiveInstructionsBehaviour(CyclicBehaviour):
@@ -30,7 +32,9 @@ class OccupantAgent(spade.agent.Agent):
                     self.agent.avoid_rooms.add(room_name)
 
                 elif msg.body.startswith("Assembly Point"):
-                    print(f"{self.agent.agent_name} will redirect his route due to assembly point blocked")
+                    update=f"{self.agent.agent_name} will redirect his route due to assembly point blocked"
+                    self.agent.environment.add_update(update)
+                    print(update)
                     await self.redirect_route_to_exit()
 
                 elif msg.body == "EVACUATE":
@@ -41,7 +45,9 @@ class OccupantAgent(spade.agent.Agent):
                     
         async def elevator_request(self):
             agents = self.agent.environment.management_agents.keys()
-            print(f"{self.agent.agent_name} requested Elevator")
+            update=f"{self.agent.agent_name} requested Elevator"
+            self.agent.environment.add_update(update)
+            print(update)
             for agent in agents:
                 msg = Message(to=str(agent))
                 msg.body = f"Send Elevator to Room"
@@ -53,7 +59,9 @@ class OccupantAgent(spade.agent.Agent):
             # Filter out rooms to avoid (due to fire or earthquake)
             neighbors = [room for room in neighbors if room.name not in self.agent.avoid_rooms]
             if not neighbors:
-                print(f"No available rooms to move towards! {self.agent.agent_name} is stuck.")
+                update=f"No available rooms to move towards! {self.agent.agent_name} is stuck."
+                self.agent.environment.add_update(update)
+                print(update)
                 return None
             # Sort neighbors by distance to the target room and pick the closest
             neighbors = sorted(neighbors, key=lambda room: room.distance_to(target_room))
@@ -87,7 +95,9 @@ class OccupantAgent(spade.agent.Agent):
                         destination = staircase
                         method = "staircase"
 
-                print(f"{self.agent.agent_name} is moving to {destination.name} to change floors using the {method}.")
+                update=f"{self.agent.agent_name} is moving to {destination.name} to change floors using the {method}."
+                self.agent.environment.add_update(update)
+                print(update)
                 # Navigate to the elevator or staircase first
                 while self.agent.location != destination:
                     next_room = self.get_next_room_towards_exit(destination)
@@ -100,7 +110,9 @@ class OccupantAgent(spade.agent.Agent):
                 self.agent.location = dest_room
                 await self.elevator_request()
                 await asyncio.sleep(4)
-                print(f"{self.agent.agent_name} is now on floor {self.agent.location.floor} after using the {method}. Continuing to the exit.")
+                update=f"{self.agent.agent_name} is now on floor {self.agent.location.floor} after using the {method}. Continuing to the exit."
+                self.agent.environment.add_update(update)
+                print(update)
             while self.agent.location != nearest_exit:
                 next_room = self.get_next_room_towards_exit(nearest_exit)
                 await asyncio.sleep(self.agent.pace)
@@ -108,7 +120,10 @@ class OccupantAgent(spade.agent.Agent):
                 print(f"{self.agent.agent_name} moved from {self.agent.location.name} to {next_room.name}")
                 self.agent.location = next_room
             if self.agent.location == nearest_exit:
-                print(f"{self.agent.agent_name} has arrived at the exit at {nearest_exit.name}!")
+                update=f"{self.agent.agent_name} has arrived at the exit at {nearest_exit.name}!"
+                self.agent.environment.add_update(update)
+                print(update)
+                self.agent.location="Evacuated"
                 self.agent.finish_time=time.time()
                 self.agent.is_evacuated=True
 
@@ -142,19 +157,23 @@ class EmergencyResponderAgent(spade.agent.Agent):
             if msg:
                 if msg.body.startswith("Fire") and self.agent.job == "firefighter":
                     room = msg.body.split()[-1]  # Extract room name to avoid
-                    room = self.agent.environment.get_room(int(room[0])-1,int(room[1])-1,int(room[2])-1)
+                    room = self.agent.environment.get_room(int(room[0])-1,int(room[1]),int(room[2]))
                     await self.agent.navigate_to_room(room)
-                    print(f"{self.agent.responder_name} has arrived at {room.name}. Fire extinguished.")
+                    update=f"{self.agent.responder_name} has arrived at {room.name}. Fire extinguished."
+                    self.agent.environment.add_update(update)
+                    print(update)
                     self.agent.environment.responses+=1
                     self.agent.environment.num_fires[0]+=1
-                    room.is_on_fire = False
+                    room.is_on_fire = False 
                     room.noted_fire = False
 
                 elif msg.body.startswith("Earthquake") and self.agent.job=="Rescue Worker":
                     room = msg.body.split()[-1]  # Extract room name to avoid
-                    room = self.agent.environment.get_room(int(room[0])-1,int(room[1])-1,int(room[2])-1)
+                    room = self.agent.environment.get_room(int(room[0])-1,int(room[1]),int(room[2]))
                     await self.agent.navigate_to_room(room)
-                    print(f"{self.agent.responder_name} has arrived at {room.name}. Wreckage removed.")
+                    update=f"{self.agent.responder_name} has arrived at {room.name}. Wreckage removed."
+                    self.agent.environment.add_update(update)
+                    print(update)
                     self.agent.environment.responses+=1
                     self.agent.environment.num_earthquakes[0]+=1
                     room.is_damaged = False
@@ -162,9 +181,11 @@ class EmergencyResponderAgent(spade.agent.Agent):
                     
                 elif msg.body.startswith("Attack") and self.agent.job=="Security Officer":
                     room = msg.body.split()[-1]  # Extract room name to avoid
-                    room = self.agent.environment.get_room(int(room[0])-1,int(room[1])-1,int(room[2])-1)
+                    room = self.agent.environment.get_room(int(room[0])-1,int(room[1]),int(room[2]))
                     await self.agent.navigate_to_room(room)
-                    print(f"{self.agent.responder_name} has arrived at {room.name}. Attack controlled.")
+                    update=f"{self.agent.responder_name} has arrived at {room.name}. Attack controlled."
+                    self.agent.environment.add_update(update)
+                    print(update)
                     self.agent.environment.num_attacks[0]+=1
                     self.agent.environment.responses+=1
                     room.is_taken = False
@@ -172,12 +193,16 @@ class EmergencyResponderAgent(spade.agent.Agent):
 
                 elif msg.body.startswith("Paramedics") and self.agent.job=="Paramedic":
                     room = msg.body.split()[-1]  # Extract room name to avoid
-                    room = self.agent.environment.get_room(int(room[0])-1,int(room[1])-1,int(room[2])-1)
+                    room = self.agent.environment.get_room(int(room[0])-1,int(room[1]),int(room[2]))
                     await self.agent.navigate_to_room(room)
-                    print(f"{self.agent.responder_name} has arrived at {room.name}. Providing medical help!")
+                    update=f"{self.agent.responder_name} has arrived at {room.name}. Providing medical help!"
+                    self.agent.environment.add_update(update)
+                    print(update)
                     self.agent.environment.responses+=1
                     await asyncio.sleep(2)
-                    print(f"{self.agent.responder_name} is leaving! Every occupant is now ok!")
+                    update=f"{self.agent.responder_name} is leaving! Every occupant is now ok!"
+                    self.agent.environment.add_update(update)
+                    print(update)
             
 
     def get_next_room_towards_destination(self, target_room):
@@ -206,11 +231,13 @@ class EmergencyResponderAgent(spade.agent.Agent):
             else:
                 destination = staircase
                 method = "staircase"
-            print(f"{self.responder_name} is moving to {destination.name} to change floors using the {method}.")
+            update=f"{self.responder_name} is moving to {destination.name} to change floors using the {method}."
+            self.environment.add_update(update)
+            print(update)
             # Navigate to the elevator or staircase first
             while self.location != destination:
                 next_room = self.get_next_room_towards_destination(destination)
-                await asyncio.sleep(1)
+                await asyncio.sleep(1.5)
                 print(f"{self.responder_name} moved from {self.location.name} to {next_room.name}")
                 self.location = next_room
             # After reaching elevator or staircase, move to the target floor
@@ -218,11 +245,12 @@ class EmergencyResponderAgent(spade.agent.Agent):
                                                   self.location.coordinates[2])
             self.location = dest_room
             await asyncio.sleep(4)
-            print(
-                f"{self.responder_name} is now on floor {self.location.floor} after using the {method}.")
+            update=f"{self.responder_name} is now on floor {self.location.floor} after using the {method}."
+            self.environment.add_update(update)
+            print(update)
         while self.location != room:
             next_room = self.get_next_room_towards_destination(room)
-            await asyncio.sleep(1)
+            await asyncio.sleep(1.5)
             # Move to the next room and update location
             print(f"{self.responder_name} moved from {self.location.name} to {next_room.name}")
             self.location = next_room
@@ -269,7 +297,9 @@ class BuildingManagementAgent(spade.agent.Agent):
                 confirmation_msg = Message(to=str(msg.sender))
                 confirmation_msg.body = "ELEVATOR ACCESS GRANTED"
                 await self.send(confirmation_msg)
-                print(f"Elevator access granted.")
+                update=f"Elevator access granted."
+                self.agent.environment.add_update(update)
+                print(update)
                 await asyncio.sleep(1)
                 await self.lock_elevator()
         async def lock_elevator(self):
@@ -292,7 +322,9 @@ class BuildingManagementAgent(spade.agent.Agent):
                                 if someone.location==room:
                                     await self.send_paramedics(room, "Fire")
                             self.agent.environment.num_fires[1]+=1
-                            print(f"{self.agent.management_name} detected fire in {room.name}!")
+                            update=f"{self.agent.management_name} detected fire in {room.name}!"
+                            self.agent.environment.add_update(update)
+                            print(update)
                             room.noted_fire=True
                             # Send evacuation instruction to avoid fire
                             await self.send_emergency_instruction(room, "Fire")
@@ -302,19 +334,26 @@ class BuildingManagementAgent(spade.agent.Agent):
                                 if someone.location==room:
                                     await self.send_paramedics(room, "Earthquake")
                             if room.light==False:
-                                print(f"{self.agent.management_name} detected lights off due to Earthquake")
+                                update=f"{self.agent.management_name} detected lights off due to Earthquake"
+                                self.agent.environment.add_update(update)
+                                print(update)
                                 await asyncio.sleep(1)
                                 room.light=True
-                                print(f"Lights turned on")
+                                update=f"Lights turned on"
+                                self.agent.environment.add_update(update)
+                                print(update)
                             self.agent.environment.num_earthquakes[1]+=1
                             room.noted_earthquake=True
-                            await self.send_emergency_instruction(room, "Earthquake")
                             if room in self.agent.environment.assembly_points:
                                 self.agent.environment.assembly_points.remove(room)
-                                print(f"Assembly Point {room.name} blocked due to earthquake damage")
+                                update=f"Assembly Point {room.name} blocked due to earthquake damage"
+                                self.agent.environment.add_update(update)
+                                print(update)
                                 await self.send_assembly_point_blocked(room)
                             else:
-                                print(f"{self.agent.management_name} detected earthquake damage in {room.name}!")
+                                update=f"{self.agent.management_name} detected earthquake damage in {room.name}!"
+                                self.agent.environment.add_update(update)
+                                print(update)
                                 # Send evacuation instruction to avoid damaged rooms
                                 await self.send_evacuate_instruction(room,"Earthquake")
                                 await self.send_emergency_instruction(room, "Earthquake")
@@ -322,7 +361,9 @@ class BuildingManagementAgent(spade.agent.Agent):
                             for someone in self.agent.environment.agents.values():
                                 if someone.location==room:
                                     await self.send_paramedics(room, "Attack")
-                            print(f"{self.agent.management_name} detected attack in {room.name}!")
+                            update=f"{self.agent.management_name} detected attack in {room.name}!"
+                            self.agent.environment.add_update(update)
+                            print(update)
                             self.agent.environment.num_attacks[1]+=1
                             room.noted_attack=True
                             await self.send_emergency_instruction(room, "Attack")
@@ -331,7 +372,9 @@ class BuildingManagementAgent(spade.agent.Agent):
 
         async def send_evacuate_instruction(self, room, why):
             # Send evacuation instruction to all occupants to avoid this room
-            print(f"Agents will avoid room {room.name} due to {why}")
+            update=f"Agents will avoid room {room.name} due to {why}"
+            self.agent.environment.add_update(update)
+            print(update)
             occupants = self.agent.environment.agents.keys()
             for occupant in occupants:
                 msg = Message(to=str(occupant))
