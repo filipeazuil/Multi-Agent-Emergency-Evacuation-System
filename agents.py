@@ -158,43 +158,55 @@ class EmergencyResponderAgent(spade.agent.Agent):
                 if msg.body.startswith("Fire") and self.agent.job == "firefighter":
                     room = msg.body.split()[-1]  # Extract room name to avoid
                     room = self.agent.environment.get_room(int(room[0])-1,int(room[1]),int(room[2]))
+                    room.begin=time.time()
                     await self.agent.navigate_to_room(room)
                     update=f"{self.agent.responder_name} has arrived at {room.name}. Fire extinguished."
                     self.agent.environment.add_update(update)
                     print(update)
                     self.agent.environment.responses+=1
                     self.agent.environment.num_fires[0]+=1
-                    room.is_on_fire = False 
+                    room.is_on_fire = False
+                    room.end=time.time()
+                    self.agent.environment.times.append(room.end-room.begin) 
                     room.noted_fire = False
 
                 elif msg.body.startswith("Earthquake") and self.agent.job=="Rescue Worker":
                     room = msg.body.split()[-1]  # Extract room name to avoid
                     room = self.agent.environment.get_room(int(room[0])-1,int(room[1]),int(room[2]))
+                    room.begin=time.time()
                     await self.agent.navigate_to_room(room)
                     update=f"{self.agent.responder_name} has arrived at {room.name}. Wreckage removed."
                     self.agent.environment.add_update(update)
                     print(update)
                     self.agent.environment.responses+=1
                     self.agent.environment.num_earthquakes[0]+=1
+                    room.end=time.time()
+                    self.agent.environment.times.append(room.end-room.begin) 
                     room.is_damaged = False
                     room.noted_earthquake = False
                     
                 elif msg.body.startswith("Attack") and self.agent.job=="Security Officer":
                     room = msg.body.split()[-1]  # Extract room name to avoid
                     room = self.agent.environment.get_room(int(room[0])-1,int(room[1]),int(room[2]))
+                    room.begin=time.time()
                     await self.agent.navigate_to_room(room)
                     update=f"{self.agent.responder_name} has arrived at {room.name}. Attack controlled."
                     self.agent.environment.add_update(update)
                     print(update)
                     self.agent.environment.num_attacks[0]+=1
                     self.agent.environment.responses+=1
+                    room.end=time.time()
+                    self.agent.environment.times.append(room.end-room.begin) 
                     room.is_taken = False
                     room.noted_attack = False
 
                 elif msg.body.startswith("Paramedics") and self.agent.job=="Paramedic":
                     room = msg.body.split()[-1]  # Extract room name to avoid
                     room = self.agent.environment.get_room(int(room[0])-1,int(room[1]),int(room[2]))
+                    room.begin=time.time()
                     await self.agent.navigate_to_room(room)
+                    room.end=time.time()
+                    self.agent.environment.times.append(room.end-room.begin) 
                     update=f"{self.agent.responder_name} has arrived at {room.name}. Providing medical help!"
                     self.agent.environment.add_update(update)
                     print(update)

@@ -17,6 +17,8 @@ class Room:
         self.noted_fire=False
         self.noted_earthquake = False
         self.noted_attack = False
+        self.begin=0
+        self.end=0
 
     # Method to add a connection to another room
     def add_connection(self, other_room):
@@ -97,6 +99,8 @@ class Building:
         self.num_fires = [0, 0]
         self.num_earthquakes = [0, 0]
         self.num_attacks = [0, 0]
+        self.times=[]
+        self.agent_times=[0,0,0,0]
         self.responses = 0
         self.num_floors=num_floors
         self.rows = random.randint(2, 6)  # Random height between 2 and 6
@@ -226,7 +230,7 @@ class Building:
             self.connect_staircase(room1, room2)
 
     def performance_metrics(self):
-        values=[self.num_fires[0],self.num_fires[1],self.num_earthquakes[0],self.num_earthquakes[1],self.num_attacks[0],self.num_attacks[1],len(self.agents.keys()),len(self.agents.keys())]
+        values=[self.num_fires[0],self.num_fires[1],self.num_earthquakes[0],self.num_earthquakes[1],self.num_attacks[0],self.num_attacks[1],len(self.agents.keys()),len(self.agents.keys()),len(self.times),sum(self.times)/len(self.times)]
         print(f"Number of Fires Extinguished / Total Fires: {self.num_fires[0]}/{self.num_fires[1]}")
         print(f"Number of Earthquakes: {self.num_earthquakes[0]}/{self.num_earthquakes[1]}")
         print(f"Number of Attacks Controlled / Total Attacks: {self.num_attacks[0]}/{self.num_attacks[1]}")
@@ -241,8 +245,8 @@ class Building:
         total_time = max(time_spent_list)
         values.append(total_time)
         print(f"Total Evacuation Time: {total_time:.2f}")
-        # print(f"Number of problems solved by Emergency Responders: {self.responses}")
-        # print(f"Average Response Time of Emergency Responders: {avg}")
+        print(f"Number of problems solved by Emergency Responders: {len(self.times)}")
+        print(f"Average Response Time of Emergency Responders: {sum(self.times)/len(self.times):.2f}")
         return values
         
     def update_perf_metrics():
