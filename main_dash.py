@@ -295,21 +295,52 @@ async def main():
     await building_management_agent.stop()
     return values
     
+import csv
+import asyncio
+
 async def run_tests():
-    values_total=[0]*11
-    n=20
+    values_total = [0] * 11
+    n = 50
+    results = []  # Store results for each test
+
     for i in range(n):
         print(f"Running test {i + 1}...")
         values = await main()
-        values_total=[x+y for x, y in zip(values_total,values)]
-    print(f"Number of Fires Extinguished / Total Fires: {values_total[0]}/{values_total[1]}")
-    print(f"Number of Earthquakes: {values_total[2]}/{values_total[3]}")
-    print(f"Number of Attacks Controlled / Total Attacks: {values_total[4]}/{values_total[5]}")
-    print(f"Number of Occupant Agents Evacuated / Total Occupant Agents: {values_total[6]}/{values_total[7]}")
-    print(f"Average Total Evacuation Time: {values_total[9]/n}")
-    print(f"Number of problems solved by Emergency Responders: {values_total[8]}")
-    print(f"Average Response Time of Emergency Responders: {values_total[10]/n:.2f}")
+        values_total = [x + y for x, y in zip(values_total, values)]
+        results.append(values)  # Add individual test results to the list
+
+    # Calculate averages and summaries
+    avg_evacuation_time = values_total[9] / n if n > 0 else 0
+    avg_response_time = values_total[10] / n if n > 0 else 0
+    summary = {
+        "Fires Extinguished": f"{values_total[0]}/{values_total[1]}",
+        "Earthquakes Resolved": f"{values_total[2]}/{values_total[3]}",
+        "Attacks Controlled": f"{values_total[4]}/{values_total[5]}",
+        "Agents Evacuated": f"{values_total[6]}/{values_total[7]}",
+        "Average Evacuation Time": avg_evacuation_time,
+        "Problems Solved by Responders": values_total[8],
+        "Average Responder Time": avg_response_time
+    }
+
+    # Save results to a CSV file
+    with open("original_results.csv", "w", newline="") as file:
+        writer = csv.writer(file)
+        # Write the header
+        writer.writerow([
+            "Test", "Fires Extinguished", "Earthquakes Resolved", "Attacks Controlled",
+            "Agents Evacuated", "Average Evacuation Time", "Problems Solved",
+            "Average Responder Time"
+        ])
+        # Write individual test results
+        for i, result in enumerate(results):
+            writer.writerow([i + 1] + result)
+        # Write summary row
+        writer.writerow([])
+        writer.writerow(["Summary"] + list(summary.values()))
+
+    print("Results saved to 'original_results.csv'.")
 
 if __name__ == "__main__":
     asyncio.run(run_tests())
+
 
