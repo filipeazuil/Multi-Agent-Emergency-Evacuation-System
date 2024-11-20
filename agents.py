@@ -52,9 +52,66 @@ class OccupantAgent(spade.agent.Agent):
                 msg = Message(to=str(agent))
                 msg.body = f"Send Elevator to Room"
                 await self.send(msg)
-
+        
+        '''
+        
+        # Optimal Algorithm
+        
         def get_next_room_towards_exit(self, target_room):
+            neighbors = self.agent.location.get_neighbors()
 
+            # Filter out rooms to avoid (due to fire or earthquake)
+            neighbors = [room for room in neighbors if room.name not in self.agent.avoid_rooms]
+            if not neighbors:
+                update = f"No available rooms to move towards! {self.agent.agent_name} is stuck."
+                self.agent.environment.add_update(update)
+                print(update)
+                return None
+
+            # Initialize emergency responder locations
+            responder_locations = [responder.location for responder in self.agent.environment.emergency_agents.values()]
+
+            # Helper function to calculate if the room has adjacent hazard rooms
+            def has_adjacent_hazards(room):
+                return any(
+                    neighbor.is_on_fire or neighbor.is_damaged
+                    for neighbor in room.get_neighbors()
+                )
+
+            # Score each neighbor based on the criteria
+            def calculate_score(room):
+                # Distance to target room (lower is better)
+                distance_to_exit = room.distance_to(target_room)
+
+                # Distance to the nearest responder (higher is better for safety)
+                distance_to_responder = min(
+                    (room.distance_to(responder_location) for responder_location in responder_locations),
+                    default=float('inf')  # No responders nearby
+                )
+
+                # Hazard proximity penalty (adjacent hazard rooms are less safe)
+                hazard_penalty = 3 if has_adjacent_hazards(room) else 0
+
+                # Weighted score: Adjust weights as needed
+                score = (distance_to_exit * 2) + (distance_to_responder * 1) + hazard_penalty
+                return score
+
+            # Sort neighbors based on the score (lowest score is best)
+            neighbors = sorted(neighbors, key=calculate_score)
+
+            # Choose the best neighbor
+            best_neighbor = neighbors[0] if neighbors else None
+
+            if best_neighbor:
+                print(f"{self.agent.agent_name} selected {best_neighbor.name} based on updated scoring system.")
+            else:
+                print(f"{self.agent.agent_name} could not find a valid neighbor.")
+
+            return best_neighbor
+            
+            '''
+
+        def get_next_room_towards_exit(self, target_room): #Standard Algorithm
             neighbors = self.agent.location.get_neighbors()
             # Filter out rooms to avoid (due to fire or earthquake)
             neighbors = [room for room in neighbors if room.name not in self.agent.avoid_rooms]

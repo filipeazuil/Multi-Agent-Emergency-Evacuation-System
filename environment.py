@@ -100,7 +100,7 @@ class Building:
         self.num_earthquakes = [0, 0]
         self.num_attacks = [0, 0]
         self.times=[]
-        self.agent_times=[0,0,0,0]
+        self.agent_times=[]
         self.responses = 0
         self.num_floors=num_floors
         self.rows = random.randint(2, 6)  # Random height between 2 and 6
