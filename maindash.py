@@ -244,11 +244,11 @@ async def main():
                 for j in range(floor.num_rows):
                     room=floor.get_room(j,i)
                     if room.is_on_fire:
-                        active_situations += f"Fire in room {room.name}.\n"
+                        active_situations += f"Fire in {room.name}.\n"
                     if room.is_damaged:
-                        active_situations += f"Earthquake damage in room {room.name}.\n"
+                        active_situations += f"Earthquake damage in {room.name}.\n"
                     if room.is_taken:
-                        active_situations += f"Attack in room {room.name}.\n"
+                        active_situations += f"Attack in {room.name}.\n"
                         
         global recent_updates
         recent_updates=building.updates
