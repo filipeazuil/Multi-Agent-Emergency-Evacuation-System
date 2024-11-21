@@ -441,7 +441,7 @@ class BuildingManagementAgent(spade.agent.Agent):
 
         async def send_evacuate_instruction(self, room, why):
             # Send evacuation instruction to all occupants to avoid this room
-            update=f"Agents will avoid room {room.name} due to {why}"
+            update=f"Agents will avoid {room.name} due to {why}"
             self.agent.environment.add_update(update)
             print(update)
             occupants = self.agent.environment.agents.keys()
